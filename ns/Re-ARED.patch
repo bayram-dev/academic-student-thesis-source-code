@@ -1,0 +1,115 @@
+diff -crB ns-allinone-2.35/ns-2.35/queue/red.cc ns-allinone-2.35-reared/ns-2.35/queue/red.cc
+*** ns-allinone-2.35/ns-2.35/queue/red.cc	2009-06-14 23:05:44.000000000 +0530
+--- ns-allinone-2.35-reared/ns-2.35/queue/red.cc	2012-01-14 15:09:45.000000000 +0530
+***************
+*** 120,125 ****
+--- 120,130 ----
+  	bind("beta_", &edp_.beta);                  // adaptive red param
+  	bind("interval_", &edp_.interval);	    // adaptive red param
+  	bind("feng_adaptive_",&edp_.feng_adaptive); // adaptive red variant
++ 	
++ 	/* Added by Mohit P. Tahiliani for Refined Adaptive RED (Re-ARED) - Start */
++ 	bind("refined_adaptive_",&edp_.refined_adaptive); // Used for Refined Adaptive RED (Re-ARED)
++ 	/* Added by Mohit P. Tahiliani for Refined Adaptive RED (Re-ARED) - End */
++ 	
+  	bind("targetdelay_", &edp_.targetdelay);    // target delay
+  	bind("top_", &edp_.top);		    // maximum for max_p	
+  	bind("bottom_", &edp_.bottom);		    // minimum for max_p	
+***************
+*** 246,251 ****
+--- 251,257 ----
+  	edp_.top = 0.0;
+  	edp_.bottom = 0.0;
+  	edp_.feng_adaptive = 0;
++ 	edp_.refined_adaptive = 0; // Added by Mohit P. Tahiliani for Refined Adaptive RED (Re-ARED)
+  	edp_.ptc = 0.0;
+  	edp_.delay = 0.0;
+  	
+***************
+*** 379,384 ****
+--- 385,418 ----
+  	} 
+  }
+  
++ /********************************** Mohit P. Tahiliani - Implementation of Refined ARED - Start ********************************************/
++ 
++ void REDQueue::updateMaxP_refined_adaptive(double new_ave, double now)
++ {
++ 	double part = 0.48*(edp_.th_max - edp_.th_min);
++ 	// AIMD rule to keep target Q~1/2(th_min+th_max)
++ 	
++ 	if ( new_ave < edp_.th_min + part && edv_.cur_max_p > edp_.bottom) {
++ 		// we increase the average queue size, so decrease max_p
++ 		edv_.cur_max_p = edv_.cur_max_p * (1.0 - (0.17 * ((edp_.th_min + part) - new_ave) / ((edp_.th_min + part) - edp_.th_min))); 
++ 		edv_.lastset = now;
++ 		double maxp = edv_.cur_max_p;
++ 		//printf("%f\t%f\n",now,maxp); 
++ 	} else if (new_ave > edp_.th_max - part && edp_.top > edv_.cur_max_p ) {
++ 		// we decrease the average queue size, so increase max_p
++ 		double alpha = edp_.alpha;
++ 		alpha = 0.25 * edv_.cur_max_p * ((new_ave - (edp_.th_max - part)) / (edp_.th_max - part));
++ 		edv_.cur_max_p = edv_.cur_max_p + alpha;
++ 		edv_.lastset = now;
++ 		double maxp = edv_.cur_max_p;
++ 		//printf("%f\t%f\n",now,maxp); 
++ 	}
++ 	
++ }
++ 
++ /********************************** Mohit P. Tahiliani - Implementation of Refined ARED - End ********************************************/
++ 
++ 
+  /*
+   * Compute the average queue size.
+   * Nqueued can be bytes or packets.
+***************
+*** 399,404 ****
+--- 433,440 ----
+  	if (edp_.adaptive == 1) {
+  		if (edp_.feng_adaptive == 1)
+  			updateMaxPFeng(new_ave);
++ 		else if ((edp_.refined_adaptive == 1) && (now > edv_.lastset + edp_.interval))
++  			updateMaxP_refined_adaptive(new_ave, now);
+  		else if (now > edv_.lastset + edp_.interval)
+  			updateMaxP(new_ave, now);
+  	}
+diff -crB ns-allinone-2.35/ns-2.35/queue/red.h ns-allinone-2.35-reared/ns-2.35/queue/red.h
+*** ns-allinone-2.35/ns-2.35/queue/red.h	2009-06-14 23:05:44.000000000 +0530
+--- ns-allinone-2.35-reared/ns-2.35/queue/red.h	2012-01-14 15:08:54.000000000 +0530
+***************
+*** 106,111 ****
+--- 106,113 ----
+  	double bottom;		/* adaptive RED: lower bound for max_p */
+  				/* 0 for automatic setting */
+  	int feng_adaptive;	/* adaptive RED: Use the Feng et al. version */
++ 
++ 	int refined_adaptive;	/* Added by Mohit P. Tahiliani for Refined Adaptive RED (Re-ARED) */
+  			
+  	/*
+  	 * Computed as a function of user supplied paramters.
+***************
+*** 155,160 ****
+--- 157,163 ----
+  	void run_estimator(int nqueued, int m);	/* Obsolete */
+  	double estimator(int nqueued, int m, double ave, double q_w);
+  	void updateMaxP(double new_ave, double now);
++ 	void updateMaxP_refined_adaptive(double new_ave, double now); //Added by Mohit P. Tahiliani - Refined Adaptive RED (Re-ARED)
+  	void updateMaxPFeng(double new_ave);
+  	int drop_early(Packet* pkt);
+  	double modify_p(double p, int count, int count_bytes, int bytes,
+diff -crB ns-allinone-2.35/ns-2.35/tcl/lib/ns-default.tcl ns-allinone-2.35-reared/ns-2.35/tcl/lib/ns-default.tcl
+*** ns-allinone-2.35/ns-2.35/tcl/lib/ns-default.tcl	2009-06-14 23:05:41.000000000 +0530
+--- ns-allinone-2.35-reared/ns-2.35/tcl/lib/ns-default.tcl	2012-01-14 15:08:50.000000000 +0530
+***************
+*** 169,174 ****
+--- 169,178 ----
+  Queue/RED set cautious_ 0
+  Queue/RED set feng_adaptive_ 0
+  
++ # Added by Mohit P. Tahiliani for Refined Adaptive RED (Re-ARED) - Start
++ Queue/RED set refined_adaptive_ 0
++ # Added by Mohit P. Tahiliani for Refined Adaptive RED (Re-ARED) - End
++ 
+  Queue/RED/RIO set bytes_ false
+  Queue/RED/RIO set queue_in_bytes_ false
+  Queue/RED/RIO set thresh_ 5

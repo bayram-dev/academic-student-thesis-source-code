@@ -1,0 +1,67 @@
+diff '--color=auto' -crB ns-allinone/ns-2.35/queue/red.cc ns-allinone-nlred/ns-2.35/queue/red.cc
+*** ns-allinone/ns-2.35/queue/red.cc	2023-03-30 00:12:27.724948000 +0300
+--- ns-allinone-nlred/ns-2.35/queue/red.cc	2023-06-29 10:28:21.725717273 +0300
+***************
+*** 120,125 ****
+--- 120,126 ----
+  	bind("beta_", &edp_.beta);                  // adaptive red param
+  	bind("interval_", &edp_.interval);	    // adaptive red param
+  	bind("feng_adaptive_",&edp_.feng_adaptive); // adaptive red variant
++ 	bind("nonlinear_",&edp_.nonlinear);	    // non-linear red variant
+  	bind("targetdelay_", &edp_.targetdelay);    // target delay
+  	bind("top_", &edp_.top);		    // maximum for max_p	
+  	bind("bottom_", &edp_.bottom);		    // minimum for max_p	
+***************
+*** 246,251 ****
+--- 247,253 ----
+  	edp_.top = 0.0;
+  	edp_.bottom = 0.0;
+  	edp_.feng_adaptive = 0;
++ 	edp_.nonlinear = 0;
+  	edp_.ptc = 0.0;
+  	edp_.delay = 0.0;
+  	
+***************
+*** 451,456 ****
+--- 453,460 ----
+                  // size ranges from th_min to th_max 
+                  p = v_a * v_ave + v_b;
+                  // p = (v_ave - th_min) / (th_max - th_min)
++ 		if(edp_.nonlinear == 1){
++ 			p *= p; 				}
+                  p *= max_p; 
+          }
+  	if (p > 1.0)
+diff '--color=auto' -crB ns-allinone/ns-2.35/queue/red.h ns-allinone-nlred/ns-2.35/queue/red.h
+*** ns-allinone/ns-2.35/queue/red.h	2023-03-30 00:12:27.724948000 +0300
+--- ns-allinone-nlred/ns-2.35/queue/red.h	2023-06-29 10:29:20.914136914 +0300
+***************
+*** 106,112 ****
+  	double bottom;		/* adaptive RED: lower bound for max_p */
+  				/* 0 for automatic setting */
+  	int feng_adaptive;	/* adaptive RED: Use the Feng et al. version */
+! 			
+  	/*
+  	 * Computed as a function of user supplied paramters.
+  	 */
+--- 106,112 ----
+  	double bottom;		/* adaptive RED: lower bound for max_p */
+  				/* 0 for automatic setting */
+  	int feng_adaptive;	/* adaptive RED: Use the Feng et al. version */
+! 	int nonlinear;	
+  	/*
+  	 * Computed as a function of user supplied paramters.
+  	 */
+diff '--color=auto' -crB ns-allinone/ns-2.35/tcl/lib/ns-default.tcl ns-allinone-nlred/ns-2.35/tcl/lib/ns-default.tcl
+*** ns-allinone/ns-2.35/tcl/lib/ns-default.tcl	2023-03-30 00:12:27.772949000 +0300
+--- ns-allinone-nlred/ns-2.35/tcl/lib/ns-default.tcl	2023-06-29 10:57:42.043910268 +0300
+***************
+*** 168,173 ****
+--- 168,174 ----
+  ###   for automatic configuration.
+  Queue/RED set cautious_ 0
+  Queue/RED set feng_adaptive_ 0
++ Queue/RED set nonlinear_ 0
+  
+  Queue/RED/RIO set bytes_ false
+  Queue/RED/RIO set queue_in_bytes_ false
